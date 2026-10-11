@@ -15,6 +15,7 @@ func NewRouter(h *handler.Handler, instanceID string) nethttp.Handler {
 	mux.HandleFunc("POST /api/orders", h.Create)
 	mux.HandleFunc("GET /api/orders", h.List)
 	mux.HandleFunc("GET /api/orders/{id}", h.Get)
+	mux.HandleFunc("PATCH /api/orders/{id}/status", h.ChangeStatus)
 
 	docs.Register(mux)
 

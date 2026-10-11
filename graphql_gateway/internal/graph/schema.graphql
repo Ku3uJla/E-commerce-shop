@@ -21,6 +21,22 @@ type OrderItem {
 }
 
 """
+Lifecycle state of an order. PENDING → PAID is driven by the payment saga.
+"""
+enum OrderStatus {
+  "Created, waiting for the payment result."
+  PENDING
+  "Payment completed."
+  PAID
+  "Handed over to delivery."
+  SHIPPED
+  "Received by the customer."
+  DELIVERED
+  "Payment failed (saga compensation) or cancelled by request."
+  CANCELLED
+}
+
+"""
 A customer order from the Order service.
 """
 type Order {
@@ -30,6 +46,12 @@ type Order {
   userId: ID!
   "Creation time, ISO-8601 (UTC)."
   createdAt: String!
+  "Current status of the order."
+  status: OrderStatus!
+  "Order total in the main currency unit, using prices captured at order time."
+  total: Float!
+  "Why the order was cancelled, if it was."
+  cancelReason: String
   "Order lines."
   items: [OrderItem!]!
 }

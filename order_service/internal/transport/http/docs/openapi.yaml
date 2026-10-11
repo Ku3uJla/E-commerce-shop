@@ -2,7 +2,11 @@ openapi: 3.1.0
 info:
   title: Order Service API
   version: 1.0.0
-  description: Customer orders. Each order line references a product from the Catalog service.
+  description: >
+    Customer orders. A new order is PENDING and starts the payment saga
+    (choreography over Kafka): `OrderCreated` → Payment → `PaymentCompleted`
+    (order becomes PAID) or `PaymentFailed` (compensation: order becomes CANCELLED).
+    Events are published from a transactional outbox to topic `order.events`.
 servers:
   - url: /
 paths:
@@ -26,6 +30,9 @@ paths:
     post:
       tags: [orders]
       summary: Place an order
+      description: >
+        Prices the items with the Catalog service and stores the order as PENDING.
+        The payment result arrives asynchronously; poll the order to see PAID or CANCELLED.
       operationId: createOrder
       requestBody:
         required: true
@@ -39,6 +46,51 @@ paths:
             application/json:
               schema: { $ref: "#/components/schemas/Order" }
         "400": { $ref: "#/components/responses/BadRequest" }
+        "503":
+          description: Catalog service unavailable
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+  /api/orders/{id}/status:
+    patch:
+      tags: [orders]
+      summary: Change the status of an order
+      description: >
+        Allowed transitions: PENDING → CANCELLED, PAID → SHIPPED | CANCELLED,
+        SHIPPED → DELIVERED. PENDING → PAID is done only by the payment saga.
+        Cancelling a PAID order makes the Payment service refund it.
+      operationId: changeOrderStatus
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [status]
+              properties:
+                status: { $ref: "#/components/schemas/OrderStatus" }
+      responses:
+        "200":
+          description: Updated order
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Order" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "404":
+          description: Order not found
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+        "409":
+          description: Transition not allowed or concurrent modification
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
   /api/orders/{id}:
     get:
       tags: [orders]
@@ -69,6 +121,9 @@ components:
         application/json:
           schema: { $ref: "#/components/schemas/Error" }
   schemas:
+    OrderStatus:
+      type: string
+      enum: [PENDING, PAID, SHIPPED, DELIVERED, CANCELLED]
     OrderItem:
       type: object
       required: [productId, quantity]
@@ -85,16 +140,27 @@ components:
           minItems: 1
           maxItems: 100
           items: { $ref: "#/components/schemas/OrderItem" }
+    OrderLine:
+      allOf:
+        - $ref: "#/components/schemas/OrderItem"
+        - type: object
+          properties:
+            unitPrice: { type: integer, format: int64, description: Price in cents at order time }
     Order:
       type: object
-      required: [id, userId, createdAt, items]
+      required: [id, userId, status, total, createdAt, updatedAt, items]
       properties:
         id: { type: string, format: uuid }
         userId: { type: string, format: uuid }
+        status: { $ref: "#/components/schemas/OrderStatus" }
+        total: { type: integer, format: int64, description: Total in cents }
+        cancelReason: { type: string }
+        paymentId: { type: string, format: uuid }
         createdAt: { type: string, format: date-time }
+        updatedAt: { type: string, format: date-time }
         items:
           type: array
-          items: { $ref: "#/components/schemas/OrderItem" }
+          items: { $ref: "#/components/schemas/OrderLine" }
     OrderList:
       type: object
       required: [items, count]

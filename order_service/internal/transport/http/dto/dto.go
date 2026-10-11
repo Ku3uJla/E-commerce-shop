@@ -14,18 +14,29 @@ type CreateOrderRequest struct {
 	Items  []ItemRequest `json:"items"`
 }
 
+// ChangeStatusRequest is the payload accepted by the status endpoint.
+type ChangeStatusRequest struct {
+	Status string `json:"status"`
+}
+
 // ItemResponse is the public representation of an order line.
 type ItemResponse struct {
 	ProductID string `json:"productId"`
 	Quantity  int    `json:"quantity"`
+	UnitPrice int64  `json:"unitPrice"`
 }
 
 // OrderResponse is the public representation of an order.
 type OrderResponse struct {
-	ID        string         `json:"id"`
-	UserID    string         `json:"userId"`
-	CreatedAt time.Time      `json:"createdAt"`
-	Items     []ItemResponse `json:"items"`
+	ID           string         `json:"id"`
+	UserID       string         `json:"userId"`
+	Status       string         `json:"status"`
+	Total        int64          `json:"total"`
+	CancelReason string         `json:"cancelReason,omitempty"`
+	PaymentID    string         `json:"paymentId,omitempty"`
+	CreatedAt    time.Time      `json:"createdAt"`
+	UpdatedAt    time.Time      `json:"updatedAt"`
+	Items        []ItemResponse `json:"items"`
 }
 
 // OrderListResponse wraps a list of orders.

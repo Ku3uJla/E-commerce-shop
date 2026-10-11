@@ -13,12 +13,15 @@ import (
 	"github.com/google/uuid"
 	"github.com/joho/godotenv"
 
+	"order_service/internal/catalog"
 	"order_service/internal/config"
 	"order_service/internal/discovery"
 	"order_service/internal/domain/order"
+	"order_service/internal/messaging"
 	repository "order_service/internal/repository/postgres"
 	httptransport "order_service/internal/transport/http"
 	"order_service/internal/transport/http/handler"
+	kafkatransport "order_service/internal/transport/kafka"
 )
 
 func main() {
@@ -41,8 +44,20 @@ func main() {
 		log.Fatalf("failed to migrate database: %v", err)
 	}
 
+	// Background workers (outbox relay, saga consumer) stop with this context.
+	ctx, stopWorkers := context.WithCancel(context.Background())
+	if err := messaging.EnsureTopics(ctx, cfg.KafkaBrokers, 3, order.TopicOrderEvents, order.TopicPaymentEvents); err != nil {
+		log.Fatalf("failed to prepare kafka topics: %v", err)
+	}
+	publisher := messaging.NewPublisher(cfg.KafkaBrokers)
+	defer publisher.Close()
+
 	repo := repository.NewOrderRepo(db)
-	svc := order.NewService(repo)
+	svc := order.NewService(repo, catalog.NewClient(cfg.CatalogURL))
+
+	go repository.NewOutboxRelay(db, publisher).Run(ctx)
+	go messaging.Consume(ctx, cfg.KafkaBrokers, "order-service", order.TopicPaymentEvents, kafkatransport.PaymentEventsHandler(svc))
+
 	h := handler.New(svc, instanceID)
 	router := httptransport.NewRouter(h, instanceID)
 
@@ -68,10 +83,11 @@ func main() {
 	registerWithConsul(consul, cfg, serviceID, instanceID)
 
 	<-stop
+	stopWorkers()
 
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	shutdownCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
-	if err := server.Shutdown(ctx); err != nil {
+	if err := server.Shutdown(shutdownCtx); err != nil {
 		log.Printf("graceful shutdown failed: %v", err)
 	}
 	if err := consul.Deregister(serviceID); err != nil {

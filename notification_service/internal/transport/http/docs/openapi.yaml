@@ -1,0 +1,56 @@
+openapi: 3.1.0
+info:
+  title: Notification Service API
+  version: 1.0.0
+  description: >
+    Consumes `order.events` and `payment.events` from Kafka and notifies users
+    (delivery is simulated with log output). The latest notifications are kept
+    in memory and can be inspected here.
+servers:
+  - url: /
+paths:
+  /api/notifications:
+    get:
+      tags: [notifications]
+      summary: Notifications sent to a user, newest first
+      operationId: listNotifications
+      parameters:
+        - name: userId
+          in: query
+          required: true
+          schema: { type: string, format: uuid }
+      responses:
+        "200":
+          description: Notifications of the user
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [items, count]
+                properties:
+                  items:
+                    type: array
+                    items: { $ref: "#/components/schemas/Notification" }
+                  count: { type: integer }
+        "400":
+          description: Missing userId
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error: { type: string }
+components:
+  schemas:
+    Notification:
+      type: object
+      required: [id, userId, orderId, event, message, createdAt]
+      properties:
+        id: { type: string, format: uuid }
+        userId: { type: string, format: uuid }
+        orderId: { type: string, format: uuid }
+        event:
+          type: string
+          enum: [OrderCreated, PaymentCompleted, PaymentFailed, OrderCancelled, PaymentRefunded, OrderStatusChanged]
+        message: { type: string }
+        createdAt: { type: string, format: date-time }

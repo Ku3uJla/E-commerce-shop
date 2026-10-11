@@ -30,10 +30,13 @@ type OrderItem struct {
 
 // Order mirrors an order returned by the Order service.
 type Order struct {
-	ID        string      `json:"id"`
-	UserID    string      `json:"userId"`
-	CreatedAt time.Time   `json:"createdAt"`
-	Items     []OrderItem `json:"items"`
+	ID           string      `json:"id"`
+	UserID       string      `json:"userId"`
+	CreatedAt    time.Time   `json:"createdAt"`
+	Status       string      `json:"status"`
+	Total        int64       `json:"total"` // cents
+	CancelReason string      `json:"cancelReason"`
+	Items        []OrderItem `json:"items"`
 }
 
 // Product mirrors a product returned by the Catalog service.

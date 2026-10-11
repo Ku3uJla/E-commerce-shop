@@ -35,6 +35,22 @@
             "mode": "auto",
             "program": "${workspaceFolder}/graphql_gateway/cmd/app",
             "cwd": "${workspaceFolder}/graphql_gateway"
+        },
+        {
+            "name": "Launch payment_service",
+            "type": "go",
+            "request": "launch",
+            "mode": "auto",
+            "program": "${workspaceFolder}/payment_service/cmd/app",
+            "cwd": "${workspaceFolder}/payment_service"
+        },
+        {
+            "name": "Launch notification_service",
+            "type": "go",
+            "request": "launch",
+            "mode": "auto",
+            "program": "${workspaceFolder}/notification_service/cmd/app",
+            "cwd": "${workspaceFolder}/notification_service"
         }
     ]
 }

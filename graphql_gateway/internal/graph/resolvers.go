@@ -66,6 +66,15 @@ type orderResolver struct {
 func (r *orderResolver) ID() graphql.ID     { return graphql.ID(r.o.ID) }
 func (r *orderResolver) UserID() graphql.ID { return graphql.ID(r.o.UserID) }
 func (r *orderResolver) CreatedAt() string  { return r.o.CreatedAt.UTC().Format(time.RFC3339) }
+func (r *orderResolver) Status() string     { return r.o.Status }
+func (r *orderResolver) Total() float64     { return float64(r.o.Total) / 100 }
+
+func (r *orderResolver) CancelReason() *string {
+	if r.o.CancelReason == "" {
+		return nil
+	}
+	return &r.o.CancelReason
+}
 
 func (r *orderResolver) Items() []*orderItemResolver {
 	out := make([]*orderItemResolver, len(r.o.Items))

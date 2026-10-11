@@ -5,6 +5,7 @@ import (
 	"errors"
 	"net/http"
 
+	"order_service/internal/catalog"
 	"order_service/internal/domain/order"
 	"order_service/internal/transport/http/dto"
 )
@@ -25,7 +26,8 @@ func (h *Handler) Health(w http.ResponseWriter, _ *http.Request) {
 	writeJSON(w, http.StatusOK, map[string]string{"status": "ok", "instance": h.instanceID})
 }
 
-// Create handles POST /api/orders.
+// Create handles POST /api/orders. The order starts PENDING; the payment
+// saga moves it to PAID or CANCELLED asynchronously.
 func (h *Handler) Create(w http.ResponseWriter, r *http.Request) {
 	var req dto.CreateOrderRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
@@ -80,16 +82,41 @@ func (h *Handler) Get(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, toResponse(o))
 }
 
+// ChangeStatus handles PATCH /api/orders/{id}/status.
+func (h *Handler) ChangeStatus(w http.ResponseWriter, r *http.Request) {
+	var req dto.ChangeStatusRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		writeError(w, http.StatusBadRequest, "invalid request body")
+		return
+	}
+	status, err := order.ParseStatus(req.Status)
+	if err != nil {
+		writeServiceError(w, err)
+		return
+	}
+	o, err := h.svc.ChangeStatus(r.Context(), r.PathValue("id"), status)
+	if err != nil {
+		writeServiceError(w, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, toResponse(o))
+}
+
 func toResponse(o *order.Order) dto.OrderResponse {
 	items := make([]dto.ItemResponse, 0, len(o.Items()))
 	for _, it := range o.Items() {
-		items = append(items, dto.ItemResponse{ProductID: it.ProductID(), Quantity: it.Quantity()})
+		items = append(items, dto.ItemResponse{ProductID: it.ProductID(), Quantity: it.Quantity(), UnitPrice: it.UnitPrice()})
 	}
 	return dto.OrderResponse{
-		ID:        o.ID(),
-		UserID:    o.UserID(),
-		CreatedAt: o.CreatedAt(),
-		Items:     items,
+		ID:           o.ID(),
+		UserID:       o.UserID(),
+		Status:       string(o.Status()),
+		Total:        o.Total(),
+		CancelReason: o.CancelReason(),
+		PaymentID:    o.PaymentID(),
+		CreatedAt:    o.CreatedAt(),
+		UpdatedAt:    o.UpdatedAt(),
+		Items:        items,
 	}
 }
 
@@ -100,8 +127,15 @@ func writeServiceError(w http.ResponseWriter, err error) {
 	case errors.Is(err, order.ErrInvalidID),
 		errors.Is(err, order.ErrEmptyOrder),
 		errors.Is(err, order.ErrTooManyItems),
-		errors.Is(err, order.ErrInvalidQuantity):
+		errors.Is(err, order.ErrInvalidQuantity),
+		errors.Is(err, order.ErrInvalidStatus),
+		errors.Is(err, order.ErrProductNotFound):
 		writeError(w, http.StatusBadRequest, err.Error())
+	case errors.Is(err, order.ErrInvalidTransition),
+		errors.Is(err, order.ErrConcurrentUpdate):
+		writeError(w, http.StatusConflict, err.Error())
+	case errors.Is(err, catalog.ErrUnavailable):
+		writeError(w, http.StatusServiceUnavailable, "catalog service unavailable")
 	default:
 		writeError(w, http.StatusInternalServerError, "internal error")
 	}
