@@ -44,6 +44,20 @@ func (r *memRepo) List(_ context.Context, limit, offset int) ([]*product.Product
 	return all, nil
 }
 
+func (r *memRepo) GetByIDs(_ context.Context, ids []product.ProductID) ([]*product.Product, error) {
+	out := make([]*product.Product, 0, len(ids))
+	for _, id := range ids {
+		if p, ok := r.items[id.String()]; ok {
+			out = append(out, p)
+		}
+	}
+	return out, nil
+}
+
+func (r *memRepo) Count(_ context.Context) (int64, error) {
+	return int64(len(r.items)), nil
+}
+
 func (r *memRepo) Update(_ context.Context, p *product.Product) error {
 	if _, ok := r.items[p.ID().String()]; !ok {
 		return product.ErrProductNotFound

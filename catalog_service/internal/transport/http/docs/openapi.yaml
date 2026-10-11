@@ -1,0 +1,146 @@
+openapi: 3.1.0
+info:
+  title: Catalog Service API
+  version: 1.0.0
+  description: Product catalog. Prices are in minor units (cents).
+servers:
+  - url: /
+paths:
+  /api/catalog/products:
+    get:
+      tags: [catalog]
+      summary: List products (paginated)
+      description: >
+        Returns a page of products ordered by creation date (newest first).
+        Use `page` + `limit`, or `limit` + `offset`. When `ids` is given,
+        pagination is ignored and exactly those products are returned (batch lookup).
+      operationId: listProducts
+      parameters:
+        - name: page
+          in: query
+          schema: { type: integer, minimum: 1, default: 1 }
+        - name: limit
+          in: query
+          schema: { type: integer, minimum: 1, maximum: 100, default: 20 }
+        - name: offset
+          in: query
+          schema: { type: integer, minimum: 0, default: 0 }
+        - name: ids
+          in: query
+          description: Comma-separated list of product UUIDs (max 100).
+          schema: { type: string }
+      responses:
+        "200":
+          description: A page of products
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ProductList" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+    post:
+      tags: [catalog]
+      summary: Create a product
+      operationId: createProduct
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/ProductInput" }
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Product" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+  /api/catalog/products/{id}:
+    parameters:
+      - name: id
+        in: path
+        required: true
+        schema: { type: string, format: uuid }
+    get:
+      tags: [catalog]
+      summary: Get a product by id
+      operationId: getProduct
+      responses:
+        "200":
+          description: The product
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Product" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "404": { $ref: "#/components/responses/NotFound" }
+    put:
+      tags: [catalog]
+      summary: Update a product
+      operationId: updateProduct
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/ProductInput" }
+      responses:
+        "200":
+          description: Updated
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Product" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "404": { $ref: "#/components/responses/NotFound" }
+    delete:
+      tags: [catalog]
+      summary: Delete a product
+      operationId: deleteProduct
+      responses:
+        "204": { description: Deleted }
+        "404": { $ref: "#/components/responses/NotFound" }
+components:
+  responses:
+    BadRequest:
+      description: Invalid input
+      content:
+        application/json:
+          schema: { $ref: "#/components/schemas/Error" }
+    NotFound:
+      description: Product not found
+      content:
+        application/json:
+          schema: { $ref: "#/components/schemas/Error" }
+  schemas:
+    ProductInput:
+      type: object
+      required: [name, price]
+      properties:
+        name: { type: string, maxLength: 150, examples: ["Keyboard"] }
+        description: { type: string, maxLength: 2000 }
+        price: { type: integer, format: int64, minimum: 0, description: Price in cents, examples: [4999] }
+        stock: { type: integer, minimum: 0, examples: [10] }
+    Product:
+      type: object
+      required: [id, name, price, stock, created_at]
+      properties:
+        id: { type: string, format: uuid }
+        name: { type: string }
+        description: { type: string }
+        price: { type: integer, format: int64, description: Price in cents }
+        stock: { type: integer }
+        created_at: { type: string, format: date-time }
+        updated_at: { type: [string, "null"], format: date-time }
+    ProductList:
+      type: object
+      required: [items, count, total, limit, offset, page]
+      properties:
+        items:
+          type: array
+          items: { $ref: "#/components/schemas/Product" }
+        count: { type: integer, description: Number of items in this page }
+        total: { type: integer, format: int64, description: Total number of products }
+        limit: { type: integer }
+        offset: { type: integer }
+        page: { type: integer }
+    Error:
+      type: object
+      required: [error]
+      properties:
+        error: { type: string }
+        message: { type: string }

@@ -1,0 +1,44 @@
+"""
+A product from the Catalog service.
+"""
+type Product {
+  "Product UUID."
+  id: ID!
+  "Display name of the product."
+  name: String!
+  "Price in the main currency unit (e.g. 49.99). Catalog stores cents; the gateway converts."
+  price: Float!
+}
+
+"""
+A single line of an order: a product and how many units of it were ordered.
+"""
+type OrderItem {
+  "The ordered product, resolved from the Catalog service (batched with DataLoader)."
+  product: Product!
+  "Number of units ordered. Always positive."
+  quantity: Int!
+}
+
+"""
+A customer order from the Order service.
+"""
+type Order {
+  "Order UUID."
+  id: ID!
+  "UUID of the user who placed the order."
+  userId: ID!
+  "Creation time, ISO-8601 (UTC)."
+  createdAt: String!
+  "Order lines."
+  items: [OrderItem!]!
+}
+
+type Query {
+  """
+  All orders of the given user, newest first, with product details joined
+  from the Catalog service. Products are fetched in one batched request per
+  query, so there is no N+1 problem.
+  """
+  ordersByUserId("UUID of the user." userId: ID!): [Order!]!
+}

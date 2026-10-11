@@ -41,6 +41,20 @@ func (r *fakeRepo) List(_ context.Context, limit, offset int) ([]*Product, error
 	return all, nil
 }
 
+func (r *fakeRepo) GetByIDs(_ context.Context, ids []ProductID) ([]*Product, error) {
+	out := make([]*Product, 0, len(ids))
+	for _, id := range ids {
+		if p, ok := r.items[id.String()]; ok {
+			out = append(out, p)
+		}
+	}
+	return out, nil
+}
+
+func (r *fakeRepo) Count(_ context.Context) (int64, error) {
+	return int64(len(r.items)), nil
+}
+
 func (r *fakeRepo) Update(_ context.Context, p *Product) error {
 	if _, ok := r.items[p.ID().String()]; !ok {
 		return ErrProductNotFound

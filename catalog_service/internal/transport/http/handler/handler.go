@@ -5,9 +5,15 @@ import (
 	"errors"
 	"net/http"
 	"strconv"
+	"strings"
 
 	"catalog_service/internal/domain/product"
 	"catalog_service/internal/transport/http/dto"
+)
+
+const (
+	defaultPageSize = 20
+	maxPageSize     = 100
 )
 
 // Handler holds the HTTP handlers for the catalog service.
@@ -48,10 +54,24 @@ func (h *Handler) Create(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusCreated, toResponse(p))
 }
 
-// List handles GET /api/v1/products?limit=&offset=.
+// List handles GET /api/catalog/products?page=&limit= (or ?limit=&offset=).
+// With ?ids=a,b,c it returns exactly those products in one batch, which the
+// GraphQL gateway uses to avoid N+1 requests.
 func (h *Handler) List(w http.ResponseWriter, r *http.Request) {
-	limit := parseInt(r.URL.Query().Get("limit"), 0)
-	offset := parseInt(r.URL.Query().Get("offset"), 0)
+	q := r.URL.Query()
+	if rawIDs := q.Get("ids"); rawIDs != "" {
+		h.listByIDs(w, r, rawIDs)
+		return
+	}
+
+	limit := parseInt(q.Get("limit"), defaultPageSize)
+	if limit <= 0 || limit > maxPageSize {
+		limit = defaultPageSize
+	}
+	offset := parseInt(q.Get("offset"), 0)
+	if page := parseInt(q.Get("page"), 0); page > 0 {
+		offset = (page - 1) * limit
+	}
 	if offset < 0 {
 		offset = 0
 	}
@@ -61,12 +81,56 @@ func (h *Handler) List(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusInternalServerError, "could not list products")
 		return
 	}
+	total, err := h.svc.Count(r.Context())
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, "could not list products")
+		return
+	}
+	writeJSON(w, http.StatusOK, dto.ProductListResponse{
+		Items:  toResponses(products),
+		Count:  len(products),
+		Total:  total,
+		Limit:  limit,
+		Offset: offset,
+		Page:   offset/limit + 1,
+	})
+}
 
+func (h *Handler) listByIDs(w http.ResponseWriter, r *http.Request, rawIDs string) {
+	parts := strings.Split(rawIDs, ",")
+	if len(parts) > maxPageSize {
+		writeError(w, http.StatusBadRequest, "too many ids")
+		return
+	}
+	ids := make([]product.ProductID, 0, len(parts))
+	for _, raw := range parts {
+		id, err := product.NewProductID(strings.TrimSpace(raw))
+		if err != nil {
+			writeError(w, http.StatusBadRequest, "invalid product id")
+			return
+		}
+		ids = append(ids, id)
+	}
+	products, err := h.svc.GetMany(r.Context(), ids)
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, "could not list products")
+		return
+	}
+	writeJSON(w, http.StatusOK, dto.ProductListResponse{
+		Items: toResponses(products),
+		Count: len(products),
+		Total: int64(len(products)),
+		Limit: len(ids),
+		Page:  1,
+	})
+}
+
+func toResponses(products []*product.Product) []dto.ProductResponse {
 	items := make([]dto.ProductResponse, 0, len(products))
 	for _, p := range products {
 		items = append(items, toResponse(p))
 	}
-	writeJSON(w, http.StatusOK, dto.ProductListResponse{Items: items, Count: len(items)})
+	return items
 }
 
 // Get handles GET /api/v1/products/{id}.

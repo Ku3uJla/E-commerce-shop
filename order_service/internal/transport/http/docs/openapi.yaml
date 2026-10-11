@@ -1,0 +1,110 @@
+openapi: 3.1.0
+info:
+  title: Order Service API
+  version: 1.0.0
+  description: Customer orders. Each order line references a product from the Catalog service.
+servers:
+  - url: /
+paths:
+  /api/orders:
+    get:
+      tags: [orders]
+      summary: List orders of a user
+      operationId: listOrders
+      parameters:
+        - name: userId
+          in: query
+          required: true
+          schema: { type: string, format: uuid }
+      responses:
+        "200":
+          description: Orders of the user, newest first
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/OrderList" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+    post:
+      tags: [orders]
+      summary: Place an order
+      operationId: createOrder
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/OrderInput" }
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Order" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+  /api/orders/{id}:
+    get:
+      tags: [orders]
+      summary: Get an order by id
+      operationId: getOrder
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+      responses:
+        "200":
+          description: The order
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Order" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "404":
+          description: Order not found
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+components:
+  responses:
+    BadRequest:
+      description: Invalid input
+      content:
+        application/json:
+          schema: { $ref: "#/components/schemas/Error" }
+  schemas:
+    OrderItem:
+      type: object
+      required: [productId, quantity]
+      properties:
+        productId: { type: string, format: uuid }
+        quantity: { type: integer, minimum: 1, examples: [2] }
+    OrderInput:
+      type: object
+      required: [userId, items]
+      properties:
+        userId: { type: string, format: uuid }
+        items:
+          type: array
+          minItems: 1
+          maxItems: 100
+          items: { $ref: "#/components/schemas/OrderItem" }
+    Order:
+      type: object
+      required: [id, userId, createdAt, items]
+      properties:
+        id: { type: string, format: uuid }
+        userId: { type: string, format: uuid }
+        createdAt: { type: string, format: date-time }
+        items:
+          type: array
+          items: { $ref: "#/components/schemas/OrderItem" }
+    OrderList:
+      type: object
+      required: [items, count]
+      properties:
+        items:
+          type: array
+          items: { $ref: "#/components/schemas/Order" }
+        count: { type: integer }
+    Error:
+      type: object
+      required: [error]
+      properties:
+        error: { type: string }

@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"errors"
 	"net/http"
+	"strings"
 
 	"auth_service/internal/domain/user"
 	"auth_service/internal/transport/http/dto"
@@ -20,7 +21,7 @@ func New(svc user.Service) *Handler {
 	return &Handler{svc: svc}
 }
 
-// Register handles POST /api/v1/auth/register.
+// Register handles POST /api/auth/register (alias: /api/v1/auth/register).
 func (h *Handler) Register(w http.ResponseWriter, r *http.Request) {
 	var req dto.RegisterRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
@@ -28,14 +29,19 @@ func (h *Handler) Register(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	name, err := user.NewName(req.Name)
-	if err != nil {
-		writeError(w, http.StatusBadRequest, "invalid name")
-		return
-	}
 	email, err := user.NewEmail(req.Email)
 	if err != nil {
 		writeError(w, http.StatusBadRequest, "invalid email")
+		return
+	}
+	// Name is optional: fall back to the local part of the email.
+	rawName := req.Name
+	if strings.TrimSpace(rawName) == "" {
+		rawName, _, _ = strings.Cut(email.String(), "@")
+	}
+	name, err := user.NewName(rawName)
+	if err != nil {
+		writeError(w, http.StatusBadRequest, "invalid name")
 		return
 	}
 
@@ -54,7 +60,7 @@ func (h *Handler) Register(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusCreated, map[string]string{"message": "user registered"})
 }
 
-// Login handles POST /api/v1/auth/login.
+// Login handles POST /api/auth/login (alias: /api/v1/auth/login).
 func (h *Handler) Login(w http.ResponseWriter, r *http.Request) {
 	var req dto.LoginRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {

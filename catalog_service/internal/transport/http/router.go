@@ -3,6 +3,7 @@ package http
 import (
 	nethttp "net/http"
 
+	"catalog_service/internal/transport/http/docs"
 	"catalog_service/internal/transport/http/handler"
 )
 
@@ -13,11 +14,15 @@ func NewRouter(h *handler.Handler, instanceID string) nethttp.Handler {
 
 	mux.HandleFunc("GET /healthz", h.Health)
 
-	mux.HandleFunc("POST /api/v1/products", h.Create)
-	mux.HandleFunc("GET /api/v1/products", h.List)
-	mux.HandleFunc("GET /api/v1/products/{id}", h.Get)
-	mux.HandleFunc("PUT /api/v1/products/{id}", h.Update)
-	mux.HandleFunc("DELETE /api/v1/products/{id}", h.Delete)
+	for _, prefix := range []string{"/api/catalog/products", "/api/v1/products"} {
+		mux.HandleFunc("POST "+prefix, h.Create)
+		mux.HandleFunc("GET "+prefix, h.List)
+		mux.HandleFunc("GET "+prefix+"/{id}", h.Get)
+		mux.HandleFunc("PUT "+prefix+"/{id}", h.Update)
+		mux.HandleFunc("DELETE "+prefix+"/{id}", h.Delete)
+	}
+
+	docs.Register(mux)
 
 	return withInstanceHeader(instanceID, mux)
 }

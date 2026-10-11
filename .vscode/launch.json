@@ -19,6 +19,22 @@
             "mode": "auto",
             "program": "${workspaceFolder}/catalog_service/cmd/app",
             "cwd": "${workspaceFolder}/catalog_service"
+        },
+        {
+            "name": "Launch order_service",
+            "type": "go",
+            "request": "launch",
+            "mode": "auto",
+            "program": "${workspaceFolder}/order_service/cmd/app",
+            "cwd": "${workspaceFolder}/order_service"
+        },
+        {
+            "name": "Launch graphql_gateway",
+            "type": "go",
+            "request": "launch",
+            "mode": "auto",
+            "program": "${workspaceFolder}/graphql_gateway/cmd/app",
+            "cwd": "${workspaceFolder}/graphql_gateway"
         }
     ]
 }

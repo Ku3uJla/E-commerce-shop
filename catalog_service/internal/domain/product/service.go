@@ -12,7 +12,9 @@ var ErrProductNotFound = errors.New("product not found")
 type Service interface {
 	Create(ctx context.Context, name Name, description Description, price Price, stock Stock) (*Product, error)
 	Get(ctx context.Context, id ProductID) (*Product, error)
+	GetMany(ctx context.Context, ids []ProductID) ([]*Product, error)
 	List(ctx context.Context, limit, offset int) ([]*Product, error)
+	Count(ctx context.Context) (int64, error)
 	Update(ctx context.Context, id ProductID, name Name, description Description, price Price, stock Stock) (*Product, error)
 	Delete(ctx context.Context, id ProductID) error
 }
@@ -35,6 +37,18 @@ func (srv *productSrv) Create(ctx context.Context, name Name, description Descri
 
 func (srv *productSrv) Get(ctx context.Context, id ProductID) (*Product, error) {
 	return srv.repo.GetByID(ctx, id)
+}
+
+// GetMany returns the products with the given ids; unknown ids are skipped.
+func (srv *productSrv) GetMany(ctx context.Context, ids []ProductID) ([]*Product, error) {
+	if len(ids) == 0 {
+		return []*Product{}, nil
+	}
+	return srv.repo.GetByIDs(ctx, ids)
+}
+
+func (srv *productSrv) Count(ctx context.Context) (int64, error) {
+	return srv.repo.Count(ctx)
 }
 
 func (srv *productSrv) List(ctx context.Context, limit, offset int) ([]*Product, error) {

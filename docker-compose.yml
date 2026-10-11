@@ -57,6 +57,35 @@ services:
     networks:
       - shop
 
+  order-service:
+    build:
+      context: ./order_service
+    env_file:
+      - ./order_service/.env
+    depends_on:
+      postgres:
+        condition: service_healthy
+      consul:
+        condition: service_started
+    networks:
+      - shop
+
+  graphql-gateway:
+    build:
+      context: ./graphql_gateway
+    environment:
+      APP_ENV: development
+      HTTP_ADDR: ":4000"
+      ORDER_SERVICE_URL: http://order-service:8082
+      CATALOG_SERVICE_URL: http://catalog-service:8081
+    ports:
+      - "4000:4000"
+    depends_on:
+      - order-service
+      - catalog-service
+    networks:
+      - shop
+
   gateway:
     image: nginx:1.27-alpine
     volumes:
@@ -67,6 +96,8 @@ services:
       - consul
       - auth-service
       - catalog-service
+      - order-service
+      - graphql-gateway
     networks:
       - shop
 

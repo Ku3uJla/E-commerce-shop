@@ -2,3 +2,4 @@
 -- PostgreSQL container (docker-entrypoint-initdb.d).
 CREATE DATABASE auth_service;
 CREATE DATABASE catalog_service;
+CREATE DATABASE order_service;

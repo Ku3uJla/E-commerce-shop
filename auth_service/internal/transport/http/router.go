@@ -3,6 +3,7 @@ package http
 import (
 	nethttp "net/http"
 
+	"auth_service/internal/transport/http/docs"
 	"auth_service/internal/transport/http/handler"
 	"auth_service/internal/transport/http/middleware"
 )
@@ -16,11 +17,14 @@ func NewRouter(h *handler.Handler, parser middleware.TokenParser) *nethttp.Serve
 		_, _ = w.Write([]byte(`{"status":"ok"}`))
 	})
 
-	mux.HandleFunc("POST /api/v1/auth/register", h.Register)
-	mux.HandleFunc("POST /api/v1/auth/login", h.Login)
-
 	auth := middleware.Auth(parser)
-	mux.Handle("GET /api/v1/auth/me", auth(nethttp.HandlerFunc(h.Me)))
+	for _, prefix := range []string{"/api/auth", "/api/v1/auth"} {
+		mux.HandleFunc("POST "+prefix+"/register", h.Register)
+		mux.HandleFunc("POST "+prefix+"/login", h.Login)
+		mux.Handle("GET "+prefix+"/me", auth(nethttp.HandlerFunc(h.Me)))
+	}
+
+	docs.Register(mux)
 
 	return mux
 }

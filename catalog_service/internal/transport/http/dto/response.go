@@ -15,8 +15,12 @@ type ProductResponse struct {
 
 // ProductListResponse wraps a page of products.
 type ProductListResponse struct {
-	Items []ProductResponse `json:"items"`
-	Count int               `json:"count"`
+	Items  []ProductResponse `json:"items"`
+	Count  int               `json:"count"`
+	Total  int64             `json:"total"`
+	Limit  int               `json:"limit"`
+	Offset int               `json:"offset"`
+	Page   int               `json:"page"`
 }
 
 // ErrorResponse is the unified error envelope.
